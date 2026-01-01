@@ -4,11 +4,17 @@ import sys
 import glob
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BROWSER = 'brave'  # Change to 'chrome', 'firefox', 'edge', etc. if needed
+COOKIES_FILE = os.path.join(SCRIPT_DIR, 'cookies.txt')
 
 # Enable ANSI escape codes on Windows
 if sys.platform == 'win32':
     os.system('')
+
+def get_cookie_opts():
+    """Return cookie options if cookies.txt exists"""
+    if os.path.exists(COOKIES_FILE):
+        return {'cookiefile': COOKIES_FILE}
+    return {}
 
 def clear_lines(n):
     for _ in range(n):
@@ -63,7 +69,7 @@ class ProgressTracker:
 
 def download_playlist(url, tracker):
     opts = {
-        'cookiesfrombrowser': (BROWSER,),
+        **get_cookie_opts(),
         'format': 'bestaudio/best',
         'extract_audio': True,
         'audio_format': 'mp3',
@@ -94,7 +100,7 @@ def download_playlist(url, tracker):
 
     # Get playlist info
     print("Fetching playlist info...")
-    info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
+    info_opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -126,7 +132,7 @@ def download_playlist(url, tracker):
 
 def verify_playlist(url):
     print("Fetching playlist info...")
-    opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
+    opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -169,7 +175,7 @@ def verify_playlist(url):
 def update_metadata(url):
     """Re-download metadata for existing files"""
     print("Fetching playlist info...")
-    info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
+    info_opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -180,7 +186,7 @@ def update_metadata(url):
     print(f"Updating metadata for {total} tracks...\n")
 
     opts = {
-        'cookiesfrombrowser': (BROWSER,),
+        **get_cookie_opts(),
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(SCRIPT_DIR, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
         'postprocessors': [
@@ -224,8 +230,24 @@ def update_metadata(url):
     print("Metadata update complete!")
     print("")
 
+def show_cookie_help():
+    print("\n" + "=" * 50)
+    print("AUTHENTICATION REQUIRED")
+    print("=" * 50)
+    print("\nYouTube is blocking requests. To fix this:")
+    print("\n1. Install 'Get cookies.txt LOCALLY' extension in Brave")
+    print("2. Go to youtube.com (make sure you're logged in)")
+    print("3. Click the extension and export cookies")
+    print("4. Save as 'cookies.txt' in:")
+    print(f"   {SCRIPT_DIR}")
+    print("\nThen try again.")
+    print("=" * 50)
+
 def main():
     print("\n=== YouTube Playlist Downloader ===\n")
+
+    if os.path.exists(COOKIES_FILE):
+        print("[Using cookies.txt for authentication]\n")
 
     while True:
         print("Main Menu:")
@@ -242,31 +264,45 @@ def main():
                 print("No URL provided.")
                 continue
 
-            # Get total first
-            info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
-            with yt_dlp.YoutubeDL(info_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                total = len(info.get('entries', []))
+            try:
+                # Get total first
+                info_opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
+                with yt_dlp.YoutubeDL(info_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    total = len(info.get('entries', []))
 
-            tracker = ProgressTracker(total)
-            download_playlist(url, tracker)
+                tracker = ProgressTracker(total)
+                download_playlist(url, tracker)
 
-            print("\n" + "=" * 40)
-            print("Download complete!")
+                print("\n" + "=" * 40)
+                print("Download complete!")
 
-            if tracker.errors:
-                print(f"\nFailed downloads ({len(tracker.errors)}):")
-                for err in tracker.errors:
-                    print(f"  - {err}")
+                if tracker.errors:
+                    print(f"\nFailed downloads ({len(tracker.errors)}):")
+                    for err in tracker.errors:
+                        print(f"  - {err}")
 
-            print("")
+                print("")
+
+            except Exception as e:
+                if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                    show_cookie_help()
+                else:
+                    print(f"\nError: {e}")
+                print("")
 
         elif choice == 'v':
             url = input("\nPaste playlist URL: ").strip()
             if not url:
                 print("No URL provided.")
                 continue
-            verify_playlist(url)
+            try:
+                verify_playlist(url)
+            except Exception as e:
+                if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                    show_cookie_help()
+                else:
+                    print(f"\nError: {e}")
             print("")
 
         elif choice == 'm':
@@ -274,7 +310,13 @@ def main():
             if not url:
                 print("No URL provided.")
                 continue
-            update_metadata(url)
+            try:
+                update_metadata(url)
+            except Exception as e:
+                if "Sign in to confirm" in str(e) or "bot" in str(e).lower():
+                    show_cookie_help()
+                else:
+                    print(f"\nError: {e}")
             print("")
 
         elif choice == 'q':
