@@ -1,6 +1,7 @@
 import yt_dlp
 import os
 import sys
+import glob
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -122,78 +123,162 @@ def download_playlist(url, tracker):
             tracker.display()
 
 def verify_playlist(url):
+    print("Fetching playlist info...")
     opts = {'extract_flat': True, 'quiet': True}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
-        total = len(info.get('entries', []))
+        playlist_title = info.get('title', 'Unknown Playlist')
+        entries = info.get('entries', [])
+        total = len(entries)
 
     archive_path = os.path.join(SCRIPT_DIR, 'downloaded.txt')
-    downloaded = 0
+    downloaded_ids = set()
     if os.path.exists(archive_path):
         with open(archive_path, 'r') as f:
-            downloaded = len(f.readlines())
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    downloaded_ids.add(parts[1])
 
-    return total, downloaded
+    missing = []
+    for entry in entries:
+        if entry is None:
+            continue
+        video_id = entry.get('id')
+        if video_id and video_id not in downloaded_ids:
+            missing.append(entry.get('title', video_id))
+
+    print(f"\nPlaylist: {playlist_title}")
+    print(f"  Total tracks: {total}")
+    print(f"  Downloaded: {total - len(missing)}")
+
+    if missing:
+        print(f"  Missing: {len(missing)}")
+        print("\nMissing tracks:")
+        for title in missing[:10]:
+            print(f"  - {title}")
+        if len(missing) > 10:
+            print(f"  ... and {len(missing) - 10} more")
+    else:
+        print("  All tracks downloaded!")
+
+    return len(missing) == 0
+
+def update_metadata(url):
+    """Re-download metadata for existing files"""
+    print("Fetching playlist info...")
+    info_opts = {'extract_flat': True, 'quiet': True}
+    with yt_dlp.YoutubeDL(info_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        playlist_title = info.get('title', 'Unknown Playlist')
+        entries = info.get('entries', [])
+        total = len(entries)
+
+    print(f"Playlist: {playlist_title}")
+    print(f"Updating metadata for {total} tracks...\n")
+
+    opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(SCRIPT_DIR, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
+        'postprocessors': [
+            {
+                'key': 'FFmpegMetadata',
+                'add_metadata': True,
+            },
+            {
+                'key': 'EmbedThumbnail',
+            },
+        ],
+        'writethumbnail': True,
+        'skip_download': True,
+        'ignoreerrors': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    # Print initial lines
+    print("")
+    print("")
+
+    for i, entry in enumerate(entries, 1):
+        if entry is None:
+            continue
+        video_url = entry.get('url') or f"https://www.youtube.com/watch?v={entry.get('id')}"
+        title = entry.get('title', 'Unknown')
+
+        clear_lines(2)
+        print(f"[{i}/{total}] {title[:50]}...")
+        print("Updating metadata...")
+        sys.stdout.flush()
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.download([video_url])
+        except:
+            pass
+
+    clear_lines(2)
+    print("Metadata update complete!")
+    print("")
 
 def main():
     print("\n=== YouTube Playlist Downloader ===\n")
 
-    url = input("Paste playlist URL: ").strip()
-
-    if not url:
-        print("No URL provided. Exiting.")
-        return
-
     while True:
-        print("\nStarting download...\n")
-
-        # Get total first
-        info_opts = {'extract_flat': True, 'quiet': True}
-        with yt_dlp.YoutubeDL(info_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            total = len(info.get('entries', []))
-
-        tracker = ProgressTracker(total)
-        download_playlist(url, tracker)
-
-        print("\n" + "=" * 40)
-        print("Download complete!")
-
-        if tracker.errors:
-            print(f"\nFailed downloads ({len(tracker.errors)}):")
-            for err in tracker.errors:
-                print(f"  - {err}")
-
-        print("\nOptions:")
-        print("  [V] Verify playlist (check missing songs)")
-        print("  [R] Retry download")
-        print("  [N] New playlist")
+        print("Main Menu:")
+        print("  [D] Download playlist")
+        print("  [V] Verify playlist")
+        print("  [M] Update metadata")
         print("  [Q] Quit")
 
         choice = input("\nChoice: ").strip().lower()
 
-        if choice == 'v':
-            print("\nVerifying...")
-            total, downloaded = verify_playlist(url)
-            missing = total - downloaded
-            print(f"  Playlist has {total} videos")
-            print(f"  Downloaded: {downloaded}")
-            if missing > 0:
-                print(f"  Missing: {missing}")
-            else:
-                print("  All videos accounted for!")
-        elif choice == 'r':
-            continue
-        elif choice == 'n':
-            url = input("\nPaste new playlist URL: ").strip()
+        if choice == 'd':
+            url = input("\nPaste playlist URL: ").strip()
             if not url:
                 print("No URL provided.")
-            else:
                 continue
+
+            # Get total first
+            info_opts = {'extract_flat': True, 'quiet': True}
+            with yt_dlp.YoutubeDL(info_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                total = len(info.get('entries', []))
+
+            tracker = ProgressTracker(total)
+            download_playlist(url, tracker)
+
+            print("\n" + "=" * 40)
+            print("Download complete!")
+
+            if tracker.errors:
+                print(f"\nFailed downloads ({len(tracker.errors)}):")
+                for err in tracker.errors:
+                    print(f"  - {err}")
+
+            print("")
+
+        elif choice == 'v':
+            url = input("\nPaste playlist URL: ").strip()
+            if not url:
+                print("No URL provided.")
+                continue
+            verify_playlist(url)
+            print("")
+
+        elif choice == 'm':
+            url = input("\nPaste playlist URL: ").strip()
+            if not url:
+                print("No URL provided.")
+                continue
+            update_metadata(url)
+            print("")
+
         elif choice == 'q':
             break
+
         else:
-            print("Invalid choice.")
+            print("Invalid choice.\n")
 
 if __name__ == "__main__":
     main()
