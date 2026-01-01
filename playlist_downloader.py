@@ -85,6 +85,7 @@ def main():
         print("\nOptions:")
         print("  [V] Verify playlist (check missing songs)")
         print("  [R] Retry download")
+        print("  [N] New playlist")
         print("  [Q] Quit")
 
         choice = input("\nChoice: ").strip().lower()
@@ -101,6 +102,12 @@ def main():
                 print("  All videos accounted for!")
         elif choice == 'r':
             continue
+        elif choice == 'n':
+            url = input("\nPaste new playlist URL: ").strip()
+            if not url:
+                print("No URL provided.")
+            else:
+                continue
         elif choice == 'q':
             break
         else:
