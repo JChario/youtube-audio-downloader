@@ -4,3 +4,6 @@
 *.m4a
 downloaded.txt
 cookies.txt
+build/
+dist/
+*.spec
