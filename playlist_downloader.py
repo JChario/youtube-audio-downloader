@@ -9,16 +9,17 @@ class ErrorLogger:
         self.errors = []
 
     def debug(self, msg):
-        pass
+        print(msg)
 
     def info(self, msg):
-        pass
+        print(msg)
 
     def warning(self, msg):
-        pass
+        print(f"WARNING: {msg}")
 
     def error(self, msg):
         self.errors.append(msg)
+        print(f"ERROR: {msg}")
 
 def download_playlist(url, logger):
     opts = {
