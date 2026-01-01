@@ -266,8 +266,8 @@ def update_metadata(url):
             cmd.extend(['-metadata', f'track={i}/{total}'])
             cmd.append(temp_output)
 
-            # Run ffmpeg
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # Run ffmpeg (suppress output to avoid encoding issues)
+            result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             if result.returncode == 0 and os.path.exists(temp_output):
                 os.remove(mp3_file)
