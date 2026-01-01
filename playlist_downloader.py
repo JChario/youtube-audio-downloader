@@ -4,6 +4,7 @@ import sys
 import glob
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BROWSER = 'brave'  # Change to 'chrome', 'firefox', 'edge', etc. if needed
 
 # Enable ANSI escape codes on Windows
 if sys.platform == 'win32':
@@ -62,6 +63,7 @@ class ProgressTracker:
 
 def download_playlist(url, tracker):
     opts = {
+        'cookiesfrombrowser': (BROWSER,),
         'format': 'bestaudio/best',
         'extract_audio': True,
         'audio_format': 'mp3',
@@ -92,7 +94,7 @@ def download_playlist(url, tracker):
 
     # Get playlist info
     print("Fetching playlist info...")
-    info_opts = {'extract_flat': True, 'quiet': True}
+    info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -124,7 +126,7 @@ def download_playlist(url, tracker):
 
 def verify_playlist(url):
     print("Fetching playlist info...")
-    opts = {'extract_flat': True, 'quiet': True}
+    opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -167,7 +169,7 @@ def verify_playlist(url):
 def update_metadata(url):
     """Re-download metadata for existing files"""
     print("Fetching playlist info...")
-    info_opts = {'extract_flat': True, 'quiet': True}
+    info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -178,6 +180,7 @@ def update_metadata(url):
     print(f"Updating metadata for {total} tracks...\n")
 
     opts = {
+        'cookiesfrombrowser': (BROWSER,),
         'format': 'bestaudio/best',
         'outtmpl': os.path.join(SCRIPT_DIR, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
         'postprocessors': [
@@ -240,7 +243,7 @@ def main():
                 continue
 
             # Get total first
-            info_opts = {'extract_flat': True, 'quiet': True}
+            info_opts = {'extract_flat': True, 'quiet': True, 'cookiesfrombrowser': (BROWSER,)}
             with yt_dlp.YoutubeDL(info_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 total = len(info.get('entries', []))
