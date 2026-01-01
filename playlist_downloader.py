@@ -179,7 +179,9 @@ def update_metadata(url):
     import tempfile
 
     print("Fetching playlist info...")
-    info_opts = {'quiet': True, **get_cookie_opts()}
+
+    # Get playlist with flat extraction (faster, no auth needed)
+    info_opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
@@ -206,7 +208,9 @@ def update_metadata(url):
 
         title = entry.get('title', 'Unknown')
         artist = entry.get('uploader', entry.get('channel', 'Unknown Artist'))
-        thumbnail_url = entry.get('thumbnail', '')
+        video_id = entry.get('id', '')
+        # Construct thumbnail URL from video ID
+        thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else ''
         track_num = str(i).zfill(3)
 
         clear_lines(2)
