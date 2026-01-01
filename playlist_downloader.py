@@ -173,61 +173,115 @@ def verify_playlist(url):
     return len(missing) == 0
 
 def update_metadata(url):
-    """Re-download metadata for existing files"""
+    """Update metadata for existing MP3 files"""
+    import subprocess
+    import urllib.request
+    import tempfile
+
     print("Fetching playlist info...")
-    info_opts = {'extract_flat': True, 'quiet': True, **get_cookie_opts()}
+    info_opts = {'quiet': True, **get_cookie_opts()}
     with yt_dlp.YoutubeDL(info_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         playlist_title = info.get('title', 'Unknown Playlist')
         entries = info.get('entries', [])
         total = len(entries)
 
+    playlist_dir = os.path.join(SCRIPT_DIR, playlist_title)
+
+    if not os.path.exists(playlist_dir):
+        print(f"Playlist folder not found: {playlist_dir}")
+        return
+
     print(f"Playlist: {playlist_title}")
     print(f"Updating metadata for {total} tracks...\n")
-
-    opts = {
-        **get_cookie_opts(),
-        'format': 'bestaudio/best',
-        'outtmpl': os.path.join(SCRIPT_DIR, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
-        'postprocessors': [
-            {
-                'key': 'FFmpegMetadata',
-                'add_metadata': True,
-            },
-            {
-                'key': 'EmbedThumbnail',
-            },
-        ],
-        'writethumbnail': True,
-        'skip_download': True,
-        'ignoreerrors': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
 
     # Print initial lines
     print("")
     print("")
 
+    updated = 0
     for i, entry in enumerate(entries, 1):
         if entry is None:
             continue
-        video_url = entry.get('url') or f"https://www.youtube.com/watch?v={entry.get('id')}"
+
         title = entry.get('title', 'Unknown')
+        artist = entry.get('uploader', entry.get('channel', 'Unknown Artist'))
+        thumbnail_url = entry.get('thumbnail', '')
+        track_num = str(i).zfill(3)
 
         clear_lines(2)
         print(f"[{i}/{total}] {title[:50]}...")
         print("Updating metadata...")
         sys.stdout.flush()
 
+        # Find matching MP3 file
+        mp3_file = None
+        for f in os.listdir(playlist_dir):
+            if f.endswith('.mp3') and f.startswith(f"{track_num} - "):
+                mp3_file = os.path.join(playlist_dir, f)
+                break
+
+        # Also try with 2-digit prefix
+        if not mp3_file:
+            track_num_2 = str(i).zfill(2)
+            for f in os.listdir(playlist_dir):
+                if f.endswith('.mp3') and f.startswith(f"{track_num_2} - "):
+                    mp3_file = os.path.join(playlist_dir, f)
+                    break
+
+        if not mp3_file:
+            continue
+
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([video_url])
-        except:
+            # Download thumbnail to temp file
+            thumb_file = None
+            if thumbnail_url:
+                thumb_file = os.path.join(tempfile.gettempdir(), f"thumb_{i}.jpg")
+                try:
+                    urllib.request.urlretrieve(thumbnail_url, thumb_file)
+                except:
+                    thumb_file = None
+
+            # Create temp output file
+            temp_output = mp3_file + ".temp.mp3"
+
+            # Build ffmpeg command
+            cmd = ['ffmpeg', '-y', '-i', mp3_file]
+
+            if thumb_file and os.path.exists(thumb_file):
+                cmd.extend(['-i', thumb_file])
+                cmd.extend(['-map', '0:a', '-map', '1:0'])
+                cmd.extend(['-c:v', 'mjpeg'])
+                cmd.extend(['-disposition:v', 'attached_pic'])
+
+            cmd.extend(['-c:a', 'copy'])
+            cmd.extend(['-id3v2_version', '3'])
+            cmd.extend(['-metadata', f'title={title}'])
+            cmd.extend(['-metadata', f'artist={artist}'])
+            cmd.extend(['-metadata', f'album={playlist_title}'])
+            cmd.extend(['-metadata', f'track={i}/{total}'])
+            cmd.append(temp_output)
+
+            # Run ffmpeg
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0 and os.path.exists(temp_output):
+                os.remove(mp3_file)
+                os.rename(temp_output, mp3_file)
+                updated += 1
+            else:
+                if os.path.exists(temp_output):
+                    os.remove(temp_output)
+
+            # Cleanup thumbnail
+            if thumb_file and os.path.exists(thumb_file):
+                os.remove(thumb_file)
+
+        except Exception as e:
             pass
 
     clear_lines(2)
-    print("Metadata update complete!")
+    print(f"Metadata update complete! Updated {updated}/{total} files.")
     print("")
 
 def show_cookie_help():
