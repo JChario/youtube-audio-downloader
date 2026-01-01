@@ -66,11 +66,21 @@ def download_playlist(url, tracker):
         'audio_format': 'mp3',
         'audio_quality': 0,
         'outtmpl': os.path.join(SCRIPT_DIR, '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'),
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '0',
-        }],
+        'postprocessors': [
+            {
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '0',
+            },
+            {
+                'key': 'FFmpegMetadata',
+                'add_metadata': True,
+            },
+            {
+                'key': 'EmbedThumbnail',
+            },
+        ],
+        'writethumbnail': True,
         'ignoreerrors': True,
         'download_archive': os.path.join(SCRIPT_DIR, 'downloaded.txt'),
         'progress_hooks': [tracker.progress_hook],
