@@ -1,4 +1,3 @@
-import sys
 import yt_dlp
 
 def main():
@@ -12,6 +11,12 @@ def main():
 
     print("\nStarting download...\n")
 
+    failed = []
+
+    def hook(d):
+        if d['status'] == 'error':
+            failed.append(d.get('info_dict', {}).get('webpage_url', 'Unknown URL'))
+
     opts = {
         'format': 'bestaudio/best',
         'extract_audio': True,
@@ -23,14 +28,23 @@ def main():
             'preferredcodec': 'mp3',
             'preferredquality': '0',
         }],
+        'ignoreerrors': True,
+        'download_archive': 'downloaded.txt',
+        'progress_hooks': [hook],
     }
 
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
-        print("\nDone! All files downloaded.")
-    except Exception as e:
-        print(f"\nError during download: {e}")
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([url])
+
+    print("\n" + "=" * 40)
+    print("Done!")
+
+    if failed:
+        print(f"\nFailed to download {len(failed)} video(s):")
+        for f in failed:
+            print(f"  - {f}")
+    else:
+        print("All files downloaded successfully.")
 
 if __name__ == "__main__":
     main()

@@ -30,6 +30,12 @@ python playlist_downloader.py
 
 Paste your playlist URL when prompted. Files will be saved in a folder named after the playlist.
 
+## Features
+
+- Skips already downloaded songs (tracks in `downloaded.txt`)
+- Continues if a video is unavailable
+- Reports failed downloads at the end
+
 ## License
 
 MIT
